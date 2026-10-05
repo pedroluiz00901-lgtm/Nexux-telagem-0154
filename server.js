@@ -1,0 +1,9 @@
+const http=require("http"),fs=require("fs"),path=require("path");const {WebSocketServer}=require("ws");
+const root=path.join(__dirname,"public"),rooms=new Map(),port=Number(process.env.PORT)||3000;
+const server=http.createServer((req,res)=>{try{const u=decodeURIComponent((req.url||"/").split("?")[0]);const rel=u==="/"?"index.html":u.replace(/^\/+/, "");const f=path.resolve(root,rel);if(f!==root&&!f.startsWith(root+path.sep)){res.writeHead(403);return res.end("Forbidden")}fs.readFile(f,(e,d)=>{if(e){res.writeHead(404);return res.end("Not found")}const ext=path.extname(f).toLowerCase();const types={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8"};res.writeHead(200,{"Content-Type":types[ext]||"application/octet-stream","Cache-Control":"no-cache"});res.end(d)})}catch{res.writeHead(400);res.end("Bad request")}});
+const wss=new WebSocketServer({server});const send=(ws,m)=>{if(ws.readyState===1)ws.send(JSON.stringify(m))};
+function leave(ws){if(!ws.room)return;const peers=rooms.get(ws.room);if(!peers)return;peers.delete(ws);for(const p of peers)send(p,{type:"peer-left"});if(!peers.size)rooms.delete(ws.room);ws.room=null}
+wss.on("connection",ws=>{ws.on("message",raw=>{let m;try{m=JSON.parse(raw.toString())}catch{return send(ws,{type:"error",message:"Mensagem inválida."})}
+if(m.type==="join"){const r=String(m.room||"").trim().toUpperCase();if(!/^[A-Z0-9-]{3,20}$/.test(r))return send(ws,{type:"error",message:"Código inválido."});leave(ws);ws.room=r;if(!rooms.has(r))rooms.set(r,new Set());const peers=rooms.get(r),hadPeer=peers.size>0;peers.add(ws);send(ws,{type:"joined",room:r,hasPeer:hadPeer});for(const p of peers)if(p!==ws)send(p,{type:"peer-joined"});return}
+if(ws.room)for(const p of rooms.get(ws.room)||[])if(p!==ws)send(p,m)});ws.on("close",()=>leave(ws));ws.on("error",()=>leave(ws))});
+server.listen(port,"0.0.0.0",()=>console.log("NEXUX TELAGEM na porta "+port));

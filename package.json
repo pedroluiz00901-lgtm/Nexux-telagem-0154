@@ -1,0 +1,1 @@
+{"name":"nexux-telagem","version":"2.0.1","private":true,"main":"server.js","scripts":{"start":"node server.js"},"dependencies":{"ws":"^8.18.0"}}
